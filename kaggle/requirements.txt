@@ -1,0 +1,6 @@
+openai>=1.50
+requests>=2.32
+Pillow>=10.3
+numpy>=1.26
+pydub>=0.25
+# Kaggle images ship ffmpeg; pydub shells out to it.

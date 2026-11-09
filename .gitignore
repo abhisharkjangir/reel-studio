@@ -1,0 +1,14 @@
+node_modules
+.next
+.env
+.env.local
+.env.*.local
+dist
+out
+__pycache__
+*.pyc
+.DS_Store
+kaggle/assets/music/*.mp3
+kaggle/assets/fonts/*.ttf
+!kaggle/assets/fonts/.gitkeep
+!kaggle/assets/music/.gitkeep
