@@ -46,7 +46,12 @@ def get_json(pathname: str) -> dict | None:
     blobs = list_(pathname)
     for b in blobs:
         if b.get("pathname") == pathname:
-            r = requests.get(b["downloadUrl"], timeout=30)
+            # Vercel Blob REST returns `url` (public URL for public stores). The JS SDK
+            # exposes `downloadUrl` as a convenience; raw REST does not.
+            url = b.get("url") or b.get("downloadUrl")
+            if not url:
+                return None
+            r = requests.get(url, timeout=30)
             if r.status_code == 200:
                 return r.json()
     return None
