@@ -1,4 +1,4 @@
-"""Call OpenAI to turn a topic (or user script) into scene-level reel JSON.
+"""Call Google Gemini to turn a topic (or user script) into scene-level reel JSON.
 
 Returns a dict shaped like:
     {
@@ -14,40 +14,37 @@ import json
 import os
 from typing import Any
 
-from openai import OpenAI
+from google import genai
+from google.genai import types
 
 from .constants import CTA_GUIDE, FORMATS, HOOK_STYLE_GUIDE, LANGUAGE_BY_ID
 
-_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o")
+_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
 
+# Gemini accepts JSON Schema but ignores `additionalProperties` and the OpenAI wrapper.
+# Keep it flat; required arrays are honored.
 REEL_SCHEMA: dict[str, Any] = {
-    "name": "reel_script",
-    "strict": True,
-    "schema": {
-        "type": "object",
-        "additionalProperties": False,
-        "required": ["scenes", "caption", "hashtags", "keywords"],
-        "properties": {
-            "scenes": {
-                "type": "array",
-                "minItems": 3,
-                "maxItems": 10,
-                "items": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "required": ["voiceText", "onScreenText", "emoji", "durationHint"],
-                    "properties": {
-                        "voiceText":    {"type": "string", "description": "Exactly what the voice says. Natural spoken language. Keep per scene under 30 words."},
-                        "onScreenText": {"type": "string", "description": "A very short (<= 6 words) headline for this scene displayed on the phone. Can be empty for the CTA."},
-                        "emoji":        {"type": "string", "description": "One single emoji that labels the scene visually, e.g. '📱'."},
-                        "durationHint": {"type": "number", "description": "Rough seconds for this scene, between 2 and 10."},
-                    },
+    "type": "object",
+    "required": ["scenes", "caption", "hashtags", "keywords"],
+    "properties": {
+        "scenes": {
+            "type": "array",
+            "min_items": 3,
+            "max_items": 10,
+            "items": {
+                "type": "object",
+                "required": ["voiceText", "onScreenText", "emoji", "durationHint"],
+                "properties": {
+                    "voiceText":    {"type": "string", "description": "Exactly what the voice says. Natural spoken language. Keep per scene under 30 words."},
+                    "onScreenText": {"type": "string", "description": "A very short (<= 6 words) headline for this scene displayed on the phone. Can be empty for the CTA."},
+                    "emoji":        {"type": "string", "description": "One single emoji that labels the scene visually, e.g. '📱'."},
+                    "durationHint": {"type": "number", "description": "Rough seconds for this scene, between 2 and 10."},
                 },
             },
-            "caption":  {"type": "string", "description": "Post caption (<=220 chars). Same language as the reel."},
-            "hashtags": {"type": "array", "minItems": 10, "maxItems": 20, "items": {"type": "string", "pattern": "^#[A-Za-z0-9_]+$"}},
-            "keywords": {"type": "array", "minItems": 10, "maxItems": 20, "items": {"type": "string"}},
         },
+        "caption":  {"type": "string", "description": "Post caption (<=220 chars). Same language as the reel."},
+        "hashtags": {"type": "array", "min_items": 10, "max_items": 20, "items": {"type": "string"}},
+        "keywords": {"type": "array", "min_items": 10, "max_items": 20, "items": {"type": "string"}},
     },
 }
 
@@ -77,15 +74,15 @@ Hard rules:
   - onScreenText is a tiny headline (<=6 words) sitting on top of the voice. Never a full sentence.
   - The very first scene MUST hook in under 3 seconds.
   - The final scene MUST be the call-to-action and nothing else.
-  - hashtags are mixed broad + specific, 10-20 total, all lowercase except brand names.
-  - keywords are search-intent phrases a viewer would TYPE to find this topic (not hashtags).
+  - hashtags: 10-20 total, each must start with '#', mixed broad + specific, all lowercase except brand names.
+  - keywords: 10-20 search-intent phrases a viewer would TYPE to find this topic (not hashtags, no '#').
 
-Return ONLY the JSON that matches the provided schema."""
+Return JSON that matches the provided schema."""
 
 
 def generate_script(job_input: dict, look: dict) -> dict:
-    """Call OpenAI and return the parsed reel JSON. Raises on failure."""
-    client = OpenAI()  # reads OPENAI_API_KEY from env
+    """Call Gemini and return the parsed reel JSON. Raises on failure."""
+    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 
     if job_input.get("ownScript", "").strip():
         user_msg = (
@@ -96,17 +93,23 @@ def generate_script(job_input: dict, look: dict) -> dict:
     else:
         user_msg = f"Topic: {job_input.get('topic', '').strip()}"
 
-    resp = client.chat.completions.create(
+    resp = client.models.generate_content(
         model=_MODEL,
-        messages=[
-            {"role": "system", "content": _system_prompt(look, job_input)},
-            {"role": "user",   "content": user_msg},
-        ],
-        response_format={"type": "json_schema", "json_schema": REEL_SCHEMA},
-        temperature=0.8,
+        contents=user_msg,
+        config=types.GenerateContentConfig(
+            system_instruction=_system_prompt(look, job_input),
+            temperature=0.8,
+            response_mime_type="application/json",
+            response_schema=REEL_SCHEMA,
+        ),
     )
-    content = resp.choices[0].message.content or "{}"
-    return json.loads(content)
+
+    content = resp.text or "{}"
+    data = json.loads(content)
+
+    # Gemini occasionally returns hashtags without the leading '#'. Normalize.
+    data["hashtags"] = [h if h.startswith("#") else f"#{h}" for h in data.get("hashtags", [])]
+    return data
 
 
 if __name__ == "__main__":

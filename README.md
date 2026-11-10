@@ -1,6 +1,6 @@
 # Reel Studio · personal
 
-Type a topic → get a finished Instagram reel. Script via OpenAI, voice via ElevenLabs (Sarvam fallback), rendered on your free Kaggle T4×2 GPU.
+Type a topic → get a finished Instagram reel. Script via Google Gemini (free tier, no card needed), voice via ElevenLabs (Sarvam fallback), rendered on your free Kaggle T4×2 GPU.
 
 Single user, no login, no payments, no database. Jobs are JSON files in Vercel Blob; the Kaggle notebook polls them.
 
@@ -15,7 +15,7 @@ kaggle/   Python worker + reel-maker.ipynb (upload to Kaggle)
 
 ### Accounts you need
 1. **Vercel Blob store** — Vercel dashboard → Storage → Blob → Create → copy the `BLOB_READ_WRITE_TOKEN`.
-2. **OpenAI** — get an API key with GPT-4o access.
+2. **Google Gemini** — free API key at https://aistudio.google.com/apikey (1,500 req/day free, no credit card).
 3. **ElevenLabs** — any plan (10k free credits / month is enough to start).
 4. **Kaggle** account with phone verified (otherwise GPU + internet are off).
 5. *(Optional)* **Sarvam** — unlocks Tamil/Telugu/Malayalam/Marathi/Bengali/Gujarati/Punjabi/Odia and acts as a free-credit overflow fallback for ElevenLabs.
@@ -47,7 +47,7 @@ Edit `kaggle/reel-maker.ipynb` cell 1 — change `REPO = "https://github.com/YOU
 2. Settings → Accelerator → **GPU T4 x2**.
 3. Settings → Internet → **On**.
 4. Add-ons → Secrets → add:
-   - `OPENAI_API_KEY`
+   - `GEMINI_API_KEY`
    - `ELEVENLABS_API_KEY`
    - `BLOB_READ_WRITE_TOKEN`
    - `SARVAM_API_KEY` *(optional)*
@@ -79,7 +79,7 @@ Edit `kaggle/reel-maker.ipynb` cell 1 — change `REPO = "https://github.com/YOU
 ## 4 · What the Kaggle worker does per reel (~20–30 min on T4×2)
 
 ```
-script.py   OpenAI (gpt-4o) · strict JSON schema · scenes + caption + hashtags + keywords
+script.py   Google Gemini (gemini-2.0-flash) · JSON schema · scenes + caption + hashtags + keywords
 voice.py    ElevenLabs /text-to-speech/<id>/with-timestamps (word timings)
             → fallback to Sarvam on 401/429/5xx or non-English-Hindi-Hinglish
 cover.py    Pillow 1080×1920 PNG with gradient + hook text + chips
