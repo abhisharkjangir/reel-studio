@@ -19,7 +19,9 @@ from google.genai import types
 
 from .constants import CTA_GUIDE, FORMATS, HOOK_STYLE_GUIDE, LANGUAGE_BY_ID
 
-_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
+# If the primary model is overloaded (503), try these in order.
+_FALLBACKS = ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.8-flash"]
 
 # Gemini accepts JSON Schema but ignores `additionalProperties` and the OpenAI wrapper.
 # Keep it flat; required arrays are honored.
@@ -93,16 +95,30 @@ def generate_script(job_input: dict, look: dict) -> dict:
     else:
         user_msg = f"Topic: {job_input.get('topic', '').strip()}"
 
-    resp = client.models.generate_content(
-        model=_MODEL,
-        contents=user_msg,
-        config=types.GenerateContentConfig(
-            system_instruction=_system_prompt(look, job_input),
-            temperature=0.8,
-            response_mime_type="application/json",
-            response_schema=REEL_SCHEMA,
-        ),
-    )
+    tried: list[str] = []
+    last_err: Exception | None = None
+    for model in [_MODEL] + [m for m in _FALLBACKS if m != _MODEL]:
+        tried.append(model)
+        try:
+            resp = client.models.generate_content(
+                model=model,
+                contents=user_msg,
+                config=types.GenerateContentConfig(
+                    system_instruction=_system_prompt(look, job_input),
+                    temperature=0.8,
+                    response_mime_type="application/json",
+                    response_schema=REEL_SCHEMA,
+                ),
+            )
+            break
+        except Exception as e:
+            last_err = e
+            msg = str(e)
+            if "503" in msg or "UNAVAILABLE" in msg or "high demand" in msg:
+                continue  # try the next model
+            raise
+    else:
+        raise RuntimeError(f"All Gemini models overloaded. Tried: {tried}. Last error: {last_err}")
 
     content = resp.text or "{}"
     data = json.loads(content)
