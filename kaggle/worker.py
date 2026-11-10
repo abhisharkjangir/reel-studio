@@ -48,11 +48,18 @@ def main() -> None:
             process_job(job, work)
         except Exception as e:
             traceback.print_exc()
-            fail(job, f"{type(e).__name__}: {e}")
+            try:
+                fail(job, f"{type(e).__name__}: {e}")
+            except Exception as inner:
+                print(f"[worker] fail() also failed: {inner}", flush=True)
         finally:
-            # Keep the directory for debugging if we failed.
-            if get_blob_job(jid).get("status") == "done":
-                shutil.rmtree(work, ignore_errors=True)
+            # Keep the work dir on failure for debugging; clean up on success.
+            # Check the in-memory job dict so a Blob hiccup can't crash the loop.
+            try:
+                if job.get("status") == "done":
+                    shutil.rmtree(work, ignore_errors=True)
+            except Exception:
+                pass
 
 
 # ── job lifecycle ─────────────────────────────────────────────────────────────
