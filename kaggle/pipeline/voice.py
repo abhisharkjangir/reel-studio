@@ -94,8 +94,10 @@ def _sarvam(text: str, out_wav: Path, voice_id: str, language: str, speed: float
         )
     lang_code = LANG_TO_SARVAM.get(language, "hi-IN")
 
-    # If voice_id came from an ElevenLabs selection (22-char alphanumeric), fall back to a Sarvam default.
-    sarvam_voice = voice_id if (voice_id and voice_id.islower() and "-" in voice_id) or (voice_id and voice_id.isalpha() and voice_id.islower()) else "shubh-enhi-companion"
+    # Sarvam bulbul:v2 currently supports: anushka, abhilash, manisha, vidya, arya, karun, hitesh.
+    # If the user picked an ElevenLabs voice (or a legacy Sarvam one), default to a sensible current speaker.
+    SARVAM_SPEAKERS = {"anushka", "abhilash", "manisha", "vidya", "arya", "karun", "hitesh"}
+    sarvam_voice = voice_id if (voice_id or "").lower() in SARVAM_SPEAKERS else "abhilash"
     resp = requests.post(
         f"{SARVAM_BASE}/text-to-speech",
         headers={"api-subscription-key": key, "content-type": "application/json"},

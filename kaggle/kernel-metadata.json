@@ -1,0 +1,15 @@
+{
+  "id": "abhisharjangir/notebook91c156c50d",
+  "title": "reel-maker",
+  "code_file": "reel-maker.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": "true",
+  "enable_gpu": "true",
+  "enable_tpu": "false",
+  "enable_internet": "true",
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": [],
+  "model_sources": []
+}
