@@ -94,10 +94,18 @@ def _sarvam(text: str, out_wav: Path, voice_id: str, language: str, speed: float
         )
     lang_code = LANG_TO_SARVAM.get(language, "hi-IN")
 
-    # Sarvam bulbul:v2 currently supports: anushka, abhilash, manisha, vidya, arya, karun, hitesh.
-    # If the user picked an ElevenLabs voice (or a legacy Sarvam one), default to a sensible current speaker.
-    SARVAM_SPEAKERS = {"anushka", "abhilash", "manisha", "vidya", "arya", "karun", "hitesh"}
-    sarvam_voice = voice_id if (voice_id or "").lower() in SARVAM_SPEAKERS else "abhilash"
+    # Sarvam bulbul:v3 speaker list (as of Nov 2026). If the user picked an ElevenLabs voice
+    # or an old Sarvam alias, default to a sensible current one.
+    SARVAM_SPEAKERS = {
+        "aditya", "ritu", "ashutosh", "priya", "neha", "rahul", "pooja", "rohan", "simran",
+        "kavya", "amit", "dev", "ishita", "shreya", "ratan", "varun", "manan", "sumit",
+        "roopa", "kabir", "aayan", "shubh", "advait", "anand", "tanya", "tarun", "sunny",
+        "mani", "gokul", "vijay", "shruti", "suhani", "mohit", "kavitha", "rehan", "soham", "rupali",
+    }
+    vid = (voice_id or "").lower()
+    # Collapse old aliases like "shubh-enhi-companion" → "shubh"
+    short = vid.split("-")[0] if vid else ""
+    sarvam_voice = vid if vid in SARVAM_SPEAKERS else (short if short in SARVAM_SPEAKERS else "shubh")
     resp = requests.post(
         f"{SARVAM_BASE}/text-to-speech",
         headers={"api-subscription-key": key, "content-type": "application/json"},
@@ -107,7 +115,7 @@ def _sarvam(text: str, out_wav: Path, voice_id: str, language: str, speed: float
             "speaker": sarvam_voice,
             "pitch": 0, "pace": speed, "loudness": 1.0,
             "speech_sample_rate": 22050, "enable_preprocessing": True,
-            "model": "bulbul:v2",
+            "model": "bulbul:v3",
         },
         timeout=120,
     )
